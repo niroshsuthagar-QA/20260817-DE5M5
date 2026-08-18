@@ -1,17 +1,7 @@
-#20260817-DE5M5
+# 20260817-DE5M5
 
-```python
-# Creating and using a function to enrich the data by adding in the time a book was on loan.
-data_enriched = na_dropped_data.copy()
+# Day 2 AM Goals:
 
-def enrich_dateDuration(colA, colB, df=data_enriched):
-    """
-    Takes the two input columns and the dataframe to create a new column date_delta which is the difference, in days, between colA and colB.
-    
-    Note: ColA should be the highest of the expected date columns.
-    """
-    df['date_delta'] = (df[colA]-df[colB]).dt.days
-    return df.head()
-
-enrich_dateDuration(df=data_enriched, colA='Book Returned', colB='Book checkout')
-```
+1. Get your notebook finalised so that it outputs two clean csv files.
+2. Make sure that your cleaning uses one or more functions. MUST HAVE: a function to enrich the data. A function that works out the difference in days between the date columns. 
+3. Turn your notebook into an executable .py file (manually).
