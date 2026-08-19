@@ -1,0 +1,102 @@
+x-airflow-common: &airflow-common
+  # Official Airflow image. We add the postgres provider so our DAG can talk
+  # to our app-db using a PostgresHook.
+  image: apache/airflow:2.9.3-python3.11
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Airflow's metadata DB connection string (points at airflow-db below).
+    # Quoted because the value contains colons and "://" which YAML would
+    # otherwise try to interpret.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"   # keep the UI clean - no example DAGs
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    # Pre-register a connection to our app-db so the DAG can find it by the
+    # id "app_postgres" without anyone clicking around in the UI.
+    AIRFLOW_CONN_APP_POSTGRES: "postgresql://appuser:apppass@app-db:5432/appdb"
+    _PIP_ADDITIONAL_REQUIREMENTS: apache-airflow-providers-postgres
+    AIRFLOW__WEBSERVER__SECRET_KEY: "testKey12345!" # Change to .env var
+  volumes:
+    - ./dags:/opt/airflow/dags        # our DAG files live here, mounted in live
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+    app-db:
+      condition: service_healthy
+
+services:
+
+  # --- Airflow's metadata database -----------------------------------------
+  airflow-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      # Airflow won't start cleanly until this DB is actually ready to accept
+      # connections. The healthcheck is what makes `depends_on` wait properly.
+      test: ["CMD", "pg_isready", "-U", "airflow", "-d", "airflow"]
+      interval: 5s
+      retries: 5
+
+  # --- Our application database --------------------------------------------
+  app-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppass
+      POSTGRES_DB: appdb
+    ports:
+      - "5433:5432"   # exposed on host port 5433 so YOU can inspect it too
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      # This SQL runs ONCE on first startup to seed some example data.
+      - ./init-app-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      # -d appdb avoids the harmless "database appuser does not exist" log line
+      # that pg_isready produces when no database is specified.
+      test: ["CMD", "pg_isready", "-U", "appuser", "-d", "appdb"]
+      interval: 5s
+      retries: 5
+
+  # --- One-time setup: create Airflow tables + an admin user ---------------
+  # This runs, does its job, and exits. It's the standard Airflow init step.
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --password admin \
+          --firstname admin --lastname admin \
+          --role Admin --email admin@example.com
+    restart: on-failure
+
+  # --- The Airflow web UI ---------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"   # visit http://localhost:8080
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # --- The scheduler: the brain that decides when tasks run ----------------
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    hostname: airflow-sheduler
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db-data:
+  app-db-data:
