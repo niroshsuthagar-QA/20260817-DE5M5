@@ -8,7 +8,7 @@ class TestEnrichment(unittest.TestCase):
         # Creating a test dataframe
         self.test_df = pd.DataFrame({
             'start_date': ['1/01/2025', '2/01/2025', '3/01/2025'],
-            'end_date': ['1/02/2025', '2/02/2025', '2/01/2025'],
+            'end_date': ['1/02/2025', '2/02/2025', '5/01/2025'],
         })
 
         # Convert the columns to datetime 
