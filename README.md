@@ -12,3 +12,7 @@
 2. Create a venv using:```python -m venv venv'''
 3. Activate using: ```venv/Scripts/activate.ps1```  or the git bash equivalent if using. 
 4. Install the dependencies using: ```pip install -r requirements.txt```
+
+# Day 5 CI Demo
+
+- Added YML file. 
